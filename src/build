@@ -1,0 +1,2 @@
+find -name '*.erl' -exec erlc {} \; \
+  | grep -v 'Warning: export_all flag enabled'
