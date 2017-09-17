@@ -5,6 +5,9 @@
 feed_forward(Ws, Xs) ->
   maths:sigmoid(maths:dot_prod(Ws, Xs)).
 
+feed_forward_deriv(Ws, Xs) ->
+  maths:sigmoid_deriv(maths:dot_prod(Ws, Xs)).
+
 perceptron(Weights, Inputs, Output_PIDs) ->
   receive
     {stimulate, Input} ->
