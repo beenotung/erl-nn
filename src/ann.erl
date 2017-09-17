@@ -38,9 +38,10 @@ perceptron(Ws, Inputs, Output_PIDs) ->
       io:format("~p output connected to ~p: ~p~n", [self(), Output_PID, New_Output_PIDs]),
       perceptron(Ws, Inputs, New_Output_PIDs);
     {connect_to_input, Input_PID} ->
-      New_Inputs = [{Input_PID, 0.5} | Inputs],
+      W = 0.5,
+      New_Inputs = [{Input_PID, W} | Inputs],
       io:format("~p inputs connected to ~p: ~p~n", [self(), Input_PID, New_Inputs]),
-      perceptron(Ws, New_Inputs, Output_PIDs);
+      perceptron([W | Ws], New_Inputs, Output_PIDs);
     {pass, X} ->
       Output = {self(), X},
       lists:foreach(
