@@ -1,5 +1,6 @@
 -module(ann).
 -export([
+  spawn/0,
   perceptron/3, sigmoid/1, dot_prod/2,
   replace_input/2,
   connect/2,
@@ -9,6 +10,12 @@
 -record(input, {pid, weight}).
 
 -record(output, {pid, sensitivity}).
+
+-record(backprop, {pid, sensitivity}).
+
+%% export functions
+spawn() ->
+  spawn(ann, perceptron, [[], [], []]).
 
 %% math
 
@@ -44,6 +51,9 @@ feed_forward(F, Ws, Xs) ->
 perceptron(Ws, Inputs, Outputs) ->
   Self = self(),
   receive
+    {status, PID} ->
+      PID ! {Ws, Inputs, Outputs},
+      perceptron(Ws, Inputs, Outputs);
     {stimulate, Input} ->
       New_Inputs = replace_input(Inputs, Input),
       Y = feed_forward(fun sigmoid/1, Ws, convert_to_input_weights(New_Inputs)),
@@ -66,7 +76,7 @@ perceptron(Ws, Inputs, Outputs) ->
       perceptron(Ws, Inputs, New_Outputs);
     {connect_to_input, Input_PID} ->
       W = 0.5,
-      New_Inputs = [{Input_PID, W} | Inputs],
+      New_Inputs = [#input{pid = Input_PID, weight = W} | Inputs],
       io:format("~p inputs connected to ~p: ~p~n", [Self, Input_PID, New_Inputs]),
       perceptron([W | Ws], New_Inputs, Outputs);
     {pass, X} ->
@@ -78,7 +88,39 @@ perceptron(Ws, Inputs, Outputs) ->
         end,
         Outputs
       ),
-      perceptron(Ws, Inputs, Outputs)
+      perceptron(Ws, Inputs, Outputs);
+    {learn, Backprop = #backprop{}} ->
+      Learning_rate = 0.5,
+
+      % Calculate the correct sensitivities
+      New_Outputs = update_sensitivity(Outputs, Backprop),
+      Xs = convert_to_input_weights(Inputs),
+      Y = feed_forward(fun sigmoid/1, Ws, Xs),
+      Deriv_Y = feed_forward(fun sigmoid_deriv/1, Ws, Xs),
+      Sensitivity = calculate_sensitivity(Backprop, Inputs, New_Outputs, Y, Deriv_Y),
+
+      io:format("(~p) New Sensitivities: ~p~n", [Self, New_Outputs]),
+      io:format("(~p) Calculated Sensitivity: ~p~n", [Self, Sensitivity]),
+
+      % Adjust all the weights
+      New_Ws = lists:map(
+        fun(Input) ->
+          Learning_rate * Sensitivity * Input#input.weight
+        end,
+        Inputs
+      ),
+      io:format("(~p) Adjusted Weights: ~p~n", [Self, New_Ws]),
+
+      % Propagate sensitivities and associated weights back to the previous layer
+      lists:zipwith(
+        fun(W, Input) ->
+          Input#input.pid ! {learn, #input{pid = Self, weight = Sensitivity * W}}
+        end,
+        New_Ws,
+        Inputs
+      ),
+
+      perceptron(New_Ws, Inputs, New_Outputs)
   end.
 
 %% helper functions
@@ -93,6 +135,35 @@ replace_input(Xs, Input) ->
 
 convert_to_input_weights(Inputs) -> lists:map(fun(Input) ->
   Input#input.weight end, Inputs).
+
+update_sensitivity(Outputs, #backprop{pid = Pid, sensitivity = S}) ->
+  lists:map(
+    fun(Output) ->
+      if Output#output.pid == Pid -> Output#output{sensitivity = S};
+        true -> Outputs
+      end
+    end,
+    Outputs
+  ).
+
+calculate_sensitivity(Backprop, Inputs, Outputs, Y, Deriv_Y) ->
+  if Inputs =:= [] ->
+    % Input Node
+    null;
+    Outputs =:= [] ->
+      % Output Node
+      Training_Y = Backprop#input.weight,
+      (Training_Y - Y) * Deriv_Y;
+    true ->
+      % Hidden Node
+      Deriv_Y * lists:foldl(
+        fun(Output, Acc) ->
+          Output#output.sensitivity + Acc
+        end,
+        0,
+        Outputs
+      )
+  end.
 
 %% override std impl
 
