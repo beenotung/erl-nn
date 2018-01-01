@@ -77,7 +77,7 @@ loop_node(Node = #node{}) ->
       N_Xs = maps:size(Input_Values1),
       Input_Values2 =
         if
-          N_Input == N_Xs ->
+          (N_Input == N_Xs) or (N_Input == 0) ->
             % send forward
             Sum = lists:foldl(fun add/2, 0, maps:values(Input_Values1)),
             Output = sigmoid(Sum),
@@ -95,6 +95,9 @@ loop_node(Node = #node{}) ->
             maps:new();
           N_Input > N_Xs ->
             % wait for more input
+            Input_Values1;
+          true ->
+            io:fwrite("[debug] ~p~n", [#{n_input=>N_Input, n_xs=>N_Xs}]),
             Input_Values1
         end,
       loop_node(Node#node{input_values = Input_Values2});
@@ -120,20 +123,39 @@ run(Inputs, Layers) when is_list(Layers) ->
     Input_Pid ! {input, {Input, Report_Pid}, Report_Pid}
       end,
   lists:zipwith(F, Inputs, Input_Layer),
-  todo.
+  Output_Layer = lists:last(Layers),
+  N_Output = length(Output_Layer),
+  wait_output(N_Output, []).
+
+wait_output(N, Acc) ->
+  if
+    N == 0 ->
+      Sorted = lists:keysort(1, Acc),
+      lists:map(fun({_, X}) -> X end, Sorted);
+    N > 0 ->
+      receive
+        X ->
+          wait_output(N - 1, [X | Acc])
+      end
+  end.
 
 -spec train_all([train_data()], network()) -> todo.
 train_all(Trains, Layers) when is_list(Trains), is_list(Layers) ->
   lists:foreach(fun(Train) -> train_one(Train, Layers) end, Trains),
   todo.
 
-train_one(Train, Layers) ->
+-spec train_one(Train, Layers) -> todo when
+  Train :: train_data(),
+  Layers :: network().
+train_one({Inputs, Answers}, Layers) ->
+  Outputs = run(Inputs, Layers),
+  io:fwrite("~p~n", [#{ans=>Answers, out=>Outputs}]),
   todo.
 
 test_xor() ->
   NN = init(2, 2, 1),
   GenTrain = fun({X, Y}) ->
-    Output = if X xor Y -> 1;true -> 0 end,
+    Output = if (X == 1) xor (Y == 1) -> 1;true -> 0 end,
     {[X, Y], [Output]}
              end,
   Trains = lists:map(GenTrain, [{1, 1}, {1, 0}, {0, 1}, {0, 0}]),
