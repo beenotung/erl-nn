@@ -28,7 +28,19 @@ sigmoid(X) ->
   1 / (1 + math:exp(-X)).
 
 df_sigmoid(X) ->
-  sigmoid(X) * (1 - sigmoid(X)).
+  Y = sigmoid(X),
+  Y * (1 - Y).
+
+%% -sum(t log(y) + (1-t)log(1-y))
+loss(Outputs, Targets) ->
+  loss(Outputs, Targets, 0).
+
+loss([], [], Acc) ->
+  -Acc;
+loss([Y | Outputs], [T | Targets], Acc) ->
+  E = T * math:log(Y) + (1 - T) * math:log(1 - Y),
+  New_Acc = Acc + E,
+  loss(Outputs, Targets, New_Acc).
 
 -spec init(integer(), [integer()], integer()) -> network().
 init(N_Input, N_Hidden_List, N_Output) ->
@@ -149,7 +161,11 @@ train_all(Trains, Layers) when is_list(Trains), is_list(Layers) ->
   Layers :: network().
 train_one({Inputs, Answers}, Layers) ->
   Outputs = run(Inputs, Layers),
-  io:fwrite("~p~n", [#{ans=>Answers, out=>Outputs}]),
+  io:fwrite("~p~n", [#{
+    ans=>Answers
+    , out=>Outputs
+    , loss=>loss(Outputs, Answers)
+  }]),
   todo.
 
 test_xor() ->
