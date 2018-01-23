@@ -1,0 +1,8 @@
+#!/bin/bash
+if [ -d deps ]; then
+  find deps -name '*.beam' -not -path '*/lib/*' -exec cp {} src/ \;
+  find deps -name '*.app' -not -path '*/lib/*' -exec cp {} src/ \;
+fi
+cd src
+erlc *.erl
+erl $(cat ../rel/vm.args | tr '\n' ' ') -run erl_nn_app start

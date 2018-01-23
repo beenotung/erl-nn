@@ -1,0 +1,14 @@
+= erl-nn
+
+Neural Network in Erlang
+
+== Type of Neural Network
+
+. ANN (BPNN) (deprecated)
+  - back-propagation
+. DFNN (Direct Feedback Neural Network)
+  - without back-propagation
+
+== Reference
+
+. https://medium.com/@rilut/neural-networks-without-backpropagation-direct-feedback-alignment-30d5d4848f5

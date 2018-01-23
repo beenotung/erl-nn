@@ -1,1 +1,21 @@
+deps/
+_rel/
+ebin/
+.erlang.mk/
+elearnweb.iml
+.e_learn_web.plt
+*.beam
+*.dump
+log/
+
+## Mac
+.DS_Store
+
+## database
+*.LOG
+*.DAT
+*.DCL
+*.DCD
+
+## build
 **/*.beam

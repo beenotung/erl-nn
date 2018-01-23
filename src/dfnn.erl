@@ -1,7 +1,7 @@
 %
 % Direct Feedback Alignment Neural Network
 %
-% Training without Backpropagation
+% Training without Back-propagation
 %
 % Reference:
 % https://medium.com/@rilut/neural-networks-without-backpropagation-direct-feedback-alignment-30d5d4848f5
@@ -17,6 +17,7 @@
   % pid() -> weight()
   input_values = maps:new() :: map(),
   outputs = [] :: [pid()],
+  output :: number()|undefined,
   is_output = false :: boolean()
 }).
 
@@ -51,7 +52,9 @@ init(N_Input, N_Hidden_List, N_Output) ->
       connect_layer(Input_Layer, Output_Layer),
       Output_Layer
     end, [], Layers),
-  lists:map(fun(Output_Pid) -> Output_Pid ! mark_output end, Output_Layer),
+  Self = self(),
+  lists:map(fun(Output_Pid) -> Output_Pid ! {mark_output, Self} end, Output_Layer),
+  control:foreach(fun(_) -> receive {ack, mark_output} -> ok end end, N_Output),
   Layers.
 
 create_layer(N) ->
@@ -71,10 +74,10 @@ connect_layer(Inputs, Outputs) ->
                   end, Inputs)
                 end, Outputs).
 
-loop_node(Node = #node{}) ->
+loop_node(Node0 = #node{}) ->
   receive
     {input, {Input, Input_Pid}, Report_Pid} when is_number(Input), is_pid(Input_Pid), is_pid(Report_Pid) ->
-      N_Input = maps:size(Node#node.input_weights),
+      N_Input = maps:size(Node0#node.input_weights),
       X =
         if
           N_Input == 0 ->
@@ -82,46 +85,47 @@ loop_node(Node = #node{}) ->
             Input;
           true ->
             % hidden layer or output layer, to use weight to adjust the input
-            Weight = maps:get(Input_Pid, Node#node.input_weights),
+            Weight = maps:get(Input_Pid, Node0#node.input_weights),
             Input * Weight
         end,
-      Input_Values1 = maps:put(Input_Pid, X, Node#node.input_values),
+      Input_Values1 = maps:put(Input_Pid, X, Node0#node.input_values),
       N_Xs = maps:size(Input_Values1),
-      Input_Values2 =
+      Node1 =
         if
           (N_Input == N_Xs) or (N_Input == 0) ->
             % send forward
             Sum = lists:foldl(fun add/2, 0, maps:values(Input_Values1)),
             Output = sigmoid(Sum),
             if
-              length(Node#node.outputs) == 0 ->
-                % output layer
+              Node0#node.is_output ->%or (length(Node0#node.outputs) == 0) ->
+                % output layer, also check length in case it's too fast.
                 Report_Pid ! {self(), Output};
               true ->
                 % input layer or hidden layer
                 lists:foreach(
                   fun(Output_Pid) ->
                     Output_Pid ! {input, {Output, self()}, Report_Pid}
-                  end, Node#node.outputs)
+                  end, Node0#node.outputs)
             end,
-            maps:new();
+            Node0#node{input_values = maps:new(), outputs = Output};
           N_Input > N_Xs ->
             % wait for more input
-            Input_Values1;
+            Node0#node{input_values = Input_Values1};
           true ->
             io:fwrite("[debug] ~p~n", [#{n_input=>N_Input, n_xs=>N_Xs}]),
-            Input_Values1
+            Node0#node{input_values = Input_Values1}
         end,
-      loop_node(Node#node{input_values = Input_Values2});
-    mark_output ->
-      loop_node(Node#node{is_output = true});
+      loop_node(Node1);
+    {mark_output, Report_Pid} ->
+      Report_Pid ! {ack, mark_output},
+      loop_node(Node0#node{is_output = true});
     {connect, {Input_Pid, Weight}} when is_pid(Input_Pid), is_number(Weight) ->
       io:fwrite("[log] ~p connect to ~p with weight ~p~n", [Input_Pid, self(), Weight]),
-      New_Inputs = maps:put(Input_Pid, Weight, Node#node.input_weights),
-      loop_node(Node#node{input_weights = New_Inputs});
+      New_Inputs = maps:put(Input_Pid, Weight, Node0#node.input_weights),
+      loop_node(Node0#node{input_weights = New_Inputs});
     X ->
       io:fwrite("[debug] ~p received ~p~n.", [self(), X]),
-      loop_node(Node)
+      loop_node(Node0)
   end.
 
 add(X, Y) ->
