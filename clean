@@ -1,4 +1,14 @@
 #!/bin/bash
 find src -name '*.beam' -delete
 find deps -name '*.app' -exec basename {} \; | xargs -I {} rm src/{}
-make clean
+case "$1" in
+  -q)
+    clean=true
+    ;;
+  --quick)
+    clean=true
+    ;;
+esac
+if [ ! $clean ]; then
+  make clean
+fi

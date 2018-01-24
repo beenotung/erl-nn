@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 find deps -name '*.beam' -not -path '*/lib/*' -exec cp {} src/ \;
 find deps -name '*.app' -not -path '*/lib/*' -exec cp {} src/ \;
 cd src

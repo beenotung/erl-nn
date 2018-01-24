@@ -9,7 +9,6 @@
 
 -type state() :: number().
 
--spec(state, )
 -record(state, {
   %% [{pid, weight}]
   inputs :: [{pid, number()}],

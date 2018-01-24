@@ -9,6 +9,18 @@ Neural Network in Erlang
 . DFNN (Direct Feedback Neural Network)
   - without back-propagation
 
+=== DFNN
+
+==== Architecture
+
+.Layered gen_server
+[ditaa]
+....
+node <-> layer <-> nn
+....
+
+Training and running logic module: `dfnn`.
+
 == Reference
 
 . https://medium.com/@rilut/neural-networks-without-backpropagation-direct-feedback-alignment-30d5d4848f5
